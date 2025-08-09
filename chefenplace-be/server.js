@@ -132,13 +132,7 @@ app.get('/api/health/detailed', async (req, res) => {
   }
 });
 
-// Test route
-app.get('/api/test', (req, res) => {
-  res.status(200).json({
-    message: 'Test endpoint working',
-    timestamp: new Date().toISOString(),
-  });
-});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -165,8 +159,8 @@ app.use('*', (req, res) => {
 if (require.main === module) {
   const PORT = process.env.PORT || 5002;
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📱 Chef en Place API is ready!`);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Chef en Place API is ready!`);
   });
 }
 

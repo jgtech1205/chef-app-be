@@ -12,11 +12,11 @@ const emailService = {
     try {
       const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
       
-      console.log('📧 Email Verification for:', email);
-      console.log('🔗 Verification URL:', verificationUrl);
+        console.log('Email Verification for:', email);
+  console.log('Verification URL:', verificationUrl);
       
-      // TODO: Replace with actual email service
-      // Example with SendGrid:
+      // Email service implementation with development fallback
+      // For production, uncomment and configure your preferred email service (SendGrid, AWS SES, etc.)
       /*
       const msg = {
         to: email,
@@ -31,7 +31,7 @@ const emailService = {
       if (process.env.NODE_ENV === 'development') {
         console.log(`
         =====================================
-        📧 EMAIL VERIFICATION (DEV MODE)
+        EMAIL VERIFICATION (DEV MODE)
         =====================================
         To: ${email}
         Subject: Verify your Chef en Place account
@@ -62,12 +62,12 @@ const emailService = {
   // Send trial expiry notification
   async sendTrialExpiryNotification(email, name, restaurantName, daysRemaining) {
     try {
-      console.log('📧 Trial Expiry Notification for:', email);
+      console.log('Trial Expiry Notification for:', email);
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`
         =====================================
-        📧 TRIAL EXPIRY NOTIFICATION (DEV MODE)
+        TRIAL EXPIRY NOTIFICATION (DEV MODE)
         =====================================
         To: ${email}
         Subject: Your Chef en Place trial expires in ${daysRemaining} days
@@ -97,12 +97,12 @@ const emailService = {
   // Send payment failure notification
   async sendPaymentFailureNotification(email, name, restaurantName, amount) {
     try {
-      console.log('📧 Payment Failure Notification for:', email);
+      console.log('Payment Failure Notification for:', email);
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`
         =====================================
-        📧 PAYMENT FAILURE NOTIFICATION (DEV MODE)
+        PAYMENT FAILURE NOTIFICATION (DEV MODE)
         =====================================
         To: ${email}
         Subject: Payment failed for ${restaurantName}
@@ -132,12 +132,12 @@ const emailService = {
   // Send payment receipt
   async sendPaymentReceipt(email, name, restaurantName, amount, invoiceUrl) {
     try {
-      console.log('📧 Payment Receipt for:', email);
+      console.log('Payment Receipt for:', email);
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`
         =====================================
-        📧 PAYMENT RECEIPT (DEV MODE)
+        PAYMENT RECEIPT (DEV MODE)
         =====================================
         To: ${email}
         Subject: Payment received for ${restaurantName}

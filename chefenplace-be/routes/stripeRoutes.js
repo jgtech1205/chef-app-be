@@ -468,65 +468,6 @@ router.get('/verify-session/:sessionId', async (req, res) => {
   }
 });
 
-// Debug endpoint to check user creation
-router.get('/debug/users/:email', async (req, res) => {
-  try {
-    const { email } = req.params;
-    
-    const user = await User.findOne({ email });
-    
-    if (user) {
-              res.json({
-          found: true,
-          user: {
-            id: user._id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            status: user.status,
-            isActive: user.isActive,
-            organization: user.organization,
-            restaurant: user.restaurant,
-            permissions: user.permissions,
-            createdAt: user.createdAt.toISOString(),
-          }
-        });
-    } else {
-      res.json({
-        found: false,
-        message: 'User not found'
-      });
-    }
-  } catch (error) {
-    console.error('Debug endpoint error:', error);
-    res.status(500).json({ error: 'Debug endpoint failed' });
-  }
-});
 
-// Temporary password reset for testing (remove in production)
-router.post('/debug/reset-password/:email', async (req, res) => {
-  try {
-    const { email } = req.params;
-    const { newPassword } = req.body;
-    
-    const user = await User.findOne({ email });
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Update password (will be hashed by pre-save hook)
-    user.password = newPassword;
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'Password updated successfully'
-    });
-  } catch (error) {
-    console.error('Password reset error:', error);
-    res.status(500).json({ error: 'Password reset failed' });
-  }
-});
 
 module.exports = router;

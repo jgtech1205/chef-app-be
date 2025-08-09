@@ -8,12 +8,12 @@ async function createSuperAdmin() {
   try {
     // Connect to database
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chef-en-place');
-    console.log('✅ Connected to MongoDB');
+    console.log('Connected to MongoDB');
 
     // Check if super admin already exists
     const existingSuperAdmin = await User.findOne({ role: 'super-admin' });
     if (existingSuperAdmin) {
-      console.log('❌ Super Admin already exists:', existingSuperAdmin.email);
+      console.log('Super Admin already exists:', existingSuperAdmin.email);
       process.exit(0);
     }
 
@@ -25,8 +25,8 @@ async function createSuperAdmin() {
     // Check if email is already taken
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('❌ User with this email already exists:', email);
-      console.log('💡 Please use a different email for the super admin account');
+          console.log('User with this email already exists:', email);
+    console.log('Please use a different email for the super admin account');
       process.exit(1);
     }
 
@@ -67,19 +67,19 @@ async function createSuperAdmin() {
 
     await superAdmin.save();
 
-    console.log('🎉 Super Admin created successfully!');
-    console.log('📧 Email:', email);
-    console.log('🔑 Password:', password);
-    console.log('🔗 Access URL: http://localhost:5173/super-admin');
+    console.log('Super Admin created successfully!');
+    console.log('Email:', email);
+    console.log('Password:', password);
+    console.log('Access URL:', process.env.FRONTEND_URL || 'http://localhost:5173/super-admin');
     console.log('');
-    console.log('⚠️  IMPORTANT: Change the password after first login!');
-    console.log('💡 You can now log in and manage all restaurants on the platform.');
+    console.log('IMPORTANT: Change the password after first login!');
+    console.log('You can now log in and manage all restaurants on the platform.');
 
   } catch (error) {
-    console.error('❌ Error creating super admin:', error);
+    console.error('Error creating super admin:', error);
   } finally {
     await mongoose.disconnect();
-    console.log('✅ Disconnected from MongoDB');
+    console.log('Disconnected from MongoDB');
     process.exit(0);
   }
 }

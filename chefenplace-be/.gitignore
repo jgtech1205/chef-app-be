@@ -86,6 +86,7 @@ typings/
 # Logs
 logs
 *.log
+server.log
 
 # Uploads directory
 uploads/
