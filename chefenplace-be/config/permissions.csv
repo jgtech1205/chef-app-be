@@ -1,0 +1,21 @@
+# Policy definitions for Chef en Place SaaS
+# Format: p, role, resource, action, condition
+
+# Super Admin - Can do everything
+p, super-admin, *, *, *
+
+# Head Chef - Can only manage their own restaurant
+p, head-chef, restaurant, *, own
+p, head-chef, user, *, own-org  
+p, head-chef, recipe, *, own-org
+p, head-chef, subscription, read, own
+p, head-chef, subscription, update, own
+
+# Regular User - Limited access within their organization
+p, user, recipe, read, own-org
+p, user, recipe, create, own-org
+p, user, plateup, *, own-org
+p, user, notification, read, own-org
+
+# Role inheritance
+g, head-chef, user
