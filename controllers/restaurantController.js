@@ -21,6 +21,8 @@ const restaurantController = {
   // Step 1: Restaurant information collection
   async createRestaurant(req, res) {
     try {
+      console.log('Starting restaurant creation...');
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -36,38 +38,49 @@ const restaurantController = {
         planType = 'trial',
         billingCycle = 'monthly',
       } = req.body;
+      
+      console.log('Request body received:', { restaurantName, restaurantType, headChefName, headChefEmail, planType });
 
       // Check if email already exists
+      console.log('Checking for existing user...');
       const existingUser = await User.findOne({ email: headChefEmail });
       if (existingUser) {
         return res.status(400).json({ 
           message: 'An account with this email already exists' 
         });
       }
+      console.log('No existing user found, proceeding...');
 
       // Generate organization ID from restaurant name
+      console.log('Generating organization ID...');
       const organizationId = restaurantName
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
+      console.log('Organization ID:', organizationId);
 
       // Check if organization ID already exists
+      console.log('Checking for existing restaurant...');
       const existingRestaurant = await Restaurant.findOne({ organizationId });
       if (existingRestaurant) {
         return res.status(400).json({
           message: 'A restaurant with this name already exists. Please choose a different name.'
         });
       }
+      console.log('No existing restaurant found, proceeding...');
 
       // Hash password
+      console.log('Hashing password...');
       const hashedPassword = await bcrypt.hash(headChefPassword, 12);
 
       // Generate email verification token
+      console.log('Generating email verification token...');
       const emailVerificationToken = crypto.randomBytes(32).toString('hex');
       const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
       // Create head chef user
+      console.log('Creating head chef user...');
       const headChef = new User({
         email: headChefEmail,
         password: hashedPassword,
@@ -100,9 +113,12 @@ const restaurantController = {
         },
       });
 
+      console.log('Saving head chef user...');
       await headChef.save();
+      console.log('Head chef user saved successfully');
 
       // Create restaurant
+      console.log('Creating restaurant...');
       const restaurant = new Restaurant({
         name: restaurantName,
         type: restaurantType,
@@ -112,7 +128,9 @@ const restaurantController = {
         status: planType === 'trial' ? 'trial' : 'active',
       });
 
+      console.log('Saving restaurant...');
       await restaurant.save();
+      console.log('Restaurant saved successfully');
 
       // Link user to restaurant
       headChef.restaurant = restaurant._id;
