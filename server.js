@@ -43,14 +43,19 @@ const initHeadChef = async () => {
 
 const app = express();
 
-// Connect to MongoDB (with error handling for serverless)
-try {
-  connectDB();
-  initHeadChef();
-} catch (error) {
-  console.error('Database connection error:', error.message);
-  // Don't exit in serverless environment, just log the error
-}
+// Initialize database connection
+const initializeApp = async () => {
+  try {
+    await connectDB();
+    await initHeadChef();
+  } catch (error) {
+    console.error('Database connection error:', error.message);
+    // Don't exit in serverless environment, just log the error
+  }
+};
+
+// Start initialization
+initializeApp();
 
 // Security middleware
 app.use(helmet());
