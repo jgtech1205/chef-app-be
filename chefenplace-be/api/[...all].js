@@ -24,8 +24,6 @@ const plateupFolderRoutes = require('../routes/plateupFolderRoutes');
 const stripeRoutes = require('../routes/stripeRoutes');
 const User = require('../database/models/User');
 
-const app = express();
-
 // Initialize head chef function
 const initHeadChef = async () => {
   const exists = await User.findOne({ role: 'head-chef' });
@@ -44,13 +42,14 @@ const initHeadChef = async () => {
   }
 };
 
+const app = express();
+
 // Connect to MongoDB (with error handling for serverless)
 try {
   connectDB();
   initHeadChef();
 } catch (error) {
   console.error('Database connection error:', error.message);
-  // Don't exit in serverless environment, just log the error
 }
 
 // Security middleware
@@ -180,4 +179,4 @@ app.use('*', (req, res) => {
 });
 
 // Export for Vercel serverless function
-module.exports = app;
+module.exports = app; 
