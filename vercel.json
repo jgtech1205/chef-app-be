@@ -1,11 +1,18 @@
 {
   "version": 2,
-  "functions": {
-    "api/hello.js": {
-      "maxDuration": 10
-    },
-    "hello.js": {
-      "maxDuration": 10
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
     }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
   }
 }
