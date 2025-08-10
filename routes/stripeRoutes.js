@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// Initialize Stripe only if API key is available
+let stripe;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn('STRIPE_SECRET_KEY not found - Stripe functionality will be disabled');
+}
+
 const bcrypt = require('bcryptjs');
 const Restaurant = require('../database/models/Restaurant');
 const User = require('../database/models/User');
@@ -9,6 +17,10 @@ const Subscription = require('../database/models/Subscription');
 // Create checkout session
 router.post('/create-checkout-session', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured. Please contact support.' });
+    }
+    
     const { planType, billingCycle, restaurantName, headChefEmail, headChefName, headChefPassword, restaurantType, location } = req.body;
 
     // Define product prices based on plan type
@@ -64,6 +76,10 @@ router.post('/create-checkout-session', async (req, res) => {
 
 // Webhook handler for Stripe events
 router.post('/webhook', async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
+  
   const sig = req.headers['stripe-signature'];
   let event;
 

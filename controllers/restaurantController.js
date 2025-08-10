@@ -7,7 +7,12 @@ const User = require('../database/models/User');
 const Subscription = require('../database/models/Subscription');
 
 // Stripe configuration
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+let stripe;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn('STRIPE_SECRET_KEY not found - Stripe functionality will be disabled');
+}
 
 // Email service (we'll implement this)
 const emailService = require('../services/emailService');
@@ -120,7 +125,12 @@ const restaurantController = {
       }
 
       // Send email verification
-      await emailService.sendVerificationEmail(headChef.email, headChef.name, emailVerificationToken);
+      try {
+        await emailService.sendVerificationEmail(headChef.email, headChef.name, emailVerificationToken);
+      } catch (emailError) {
+        console.error('Email service error:', emailError);
+        // Don't fail the entire registration if email fails
+      }
 
       // Generate JWT token for immediate login
       const accessToken = jwt.sign(
@@ -168,13 +178,22 @@ const restaurantController = {
 
     } catch (error) {
       console.error('Restaurant creation error:', error);
-      res.status(500).json({ message: 'Server error during restaurant creation' });
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ 
+        message: 'Server error during restaurant creation',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
     }
   },
 
   // Create Stripe subscription
   async createStripeSubscription(restaurant, planType, billingCycle) {
     try {
+      if (!stripe) {
+        console.warn('Stripe not configured - skipping subscription creation');
+        return null;
+      }
+      
       // Plan pricing configuration
       const planPricing = {
         pro: {
