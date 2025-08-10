@@ -118,21 +118,31 @@ router.get('/verify-session/:sessionId', async (req, res) => {
 
 // Test webhook endpoint
 router.get('/webhook', (req, res) => {
-  res.json({ message: 'Webhook endpoint is accessible' });
+  try {
+    res.json({ 
+      message: 'Webhook endpoint is accessible',
+      stripe_configured: !!stripe,
+      webhook_secret_exists: !!process.env.STRIPE_WEBHOOK_SECRET
+    });
+  } catch (error) {
+    console.error('Webhook test error:', error);
+    res.status(500).json({ error: 'Webhook test failed' });
+  }
 });
 
 // Webhook handler for Stripe events
 router.post('/webhook', async (req, res) => {
-  console.log('Webhook received:', req.method, req.path);
-  console.log('Webhook headers:', req.headers);
-  
-  if (!stripe) {
-    console.log('Stripe not configured, returning 503');
-    return res.status(503).json({ error: 'Stripe is not configured' });
-  }
-  
-  const sig = req.headers['stripe-signature'];
-  let event;
+  try {
+    console.log('Webhook received:', req.method, req.path);
+    console.log('Webhook headers:', req.headers);
+    
+    if (!stripe) {
+      console.log('Stripe not configured, returning 503');
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+    
+    const sig = req.headers['stripe-signature'];
+    let event;
 
   try {
     console.log('Attempting to verify webhook signature...');
@@ -164,6 +174,10 @@ router.post('/webhook', async (req, res) => {
   } catch (error) {
     console.error('Webhook processing error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
+  }
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+    res.status(500).json({ error: 'Webhook handler failed' });
   }
 });
 
