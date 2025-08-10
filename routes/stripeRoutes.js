@@ -116,9 +116,18 @@ router.get('/verify-session/:sessionId', async (req, res) => {
   }
 });
 
+// Test webhook endpoint
+router.get('/webhook', (req, res) => {
+  res.json({ message: 'Webhook endpoint is accessible' });
+});
+
 // Webhook handler for Stripe events
 router.post('/webhook', async (req, res) => {
+  console.log('Webhook received:', req.method, req.path);
+  console.log('Webhook headers:', req.headers);
+  
   if (!stripe) {
+    console.log('Stripe not configured, returning 503');
     return res.status(503).json({ error: 'Stripe is not configured' });
   }
   
@@ -126,9 +135,13 @@ router.post('/webhook', async (req, res) => {
   let event;
 
   try {
+    console.log('Attempting to verify webhook signature...');
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    console.log('Webhook signature verified successfully');
+    console.log('Event type:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
+    console.error('Webhook secret exists:', !!process.env.STRIPE_WEBHOOK_SECRET);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
