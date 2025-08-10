@@ -49,8 +49,8 @@ router.post('/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/payment-success?success=true&sid={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/restaurant-signup?canceled=true`,
+      success_url: `${process.env.FRONTEND_URL.replace(/\/$/, '')}/payment-success?success=true&sid={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL.replace(/\/$/, '')}/restaurant-signup?canceled=true`,
       metadata: {
         restaurantName,
         headChefEmail,
