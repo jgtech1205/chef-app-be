@@ -60,7 +60,20 @@ initializeApp();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+
+
+// General middleware
+app.use(compression());
+app.use(morgan('combined'));
+
+// Raw body middleware for Stripe webhooks (must come before CORS)
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
+// JSON parsing middleware for other routes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// CORS configuration (after raw body middleware)
 app.use(cors({
   origin: 'https://chef-app-frontend.vercel.app',
   credentials: true,
@@ -83,17 +96,6 @@ app.use((req, res, next) => {
   
   next();
 });
-
-// General middleware
-app.use(compression());
-app.use(morgan('combined'));
-
-// Raw body middleware for Stripe webhooks
-app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-
-// JSON parsing middleware for other routes
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging middleware
 app.use((req, res, next) => {
