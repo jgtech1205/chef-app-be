@@ -22,14 +22,35 @@ const restaurantRoutes = require('../routes/restaurantRoutes');
 const plateUpRoutes = require('../routes/plateupRoutes');
 const plateupFolderRoutes = require('../routes/plateupFolderRoutes');
 const stripeRoutes = require('../routes/stripeRoutes');
+const User = require('../database/models/User');
 
 const app = express();
+
+// Initialize head chef function
+const initHeadChef = async () => {
+  const exists = await User.findOne({ role: 'head-chef' });
+  if (!exists) {
+    const email = process.env.HEAD_CHEF_EMAIL || 'headchef@kitchen.com';
+    const password = process.env.HEAD_CHEF_PASSWORD || 'headchef123';
+    const headChef = new User({
+      email,
+      password,
+      name: 'Head Chef',
+      role: 'head-chef',
+      status: 'active',
+    });
+    await headChef.save();
+    console.log(`Auto-created Head Chef user: ${email}`);
+  }
+};
 
 // Connect to MongoDB (with error handling for serverless)
 try {
   connectDB();
+  initHeadChef();
 } catch (error) {
   console.error('Database connection error:', error.message);
+  // Don't exit in serverless environment, just log the error
 }
 
 // Security middleware
@@ -37,12 +58,13 @@ app.use(helmet());
 
 // AGGRESSIVE CORS FIX - This will definitely work
 app.use((req, res, next) => {
+  // Set CORS headers for all requests
   res.header('Access-Control-Allow-Origin', 'https://chef-app-frontend.vercel.app');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
   
-  // Handle preflight requests
+  // Handle preflight requests immediately
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -126,6 +148,14 @@ app.get('/api/health/detailed', async (req, res) => {
       error: error.message,
     });
   }
+});
+
+// Test route
+app.get('/api/test', (req, res) => {
+  res.status(200).json({
+    message: 'Test endpoint working',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Error handling middleware
