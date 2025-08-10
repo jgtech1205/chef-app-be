@@ -74,6 +74,48 @@ router.post('/create-checkout-session', async (req, res) => {
   }
 });
 
+// Verify payment session
+router.get('/verify-session/:sessionId', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const { sessionId } = req.params;
+    
+    // Retrieve the session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Check if payment was successful
+    if (session.payment_status === 'paid') {
+      res.json({
+        success: true,
+        session: {
+          id: session.id,
+          payment_status: session.payment_status,
+          customer_email: session.customer_details?.email,
+          metadata: session.metadata
+        }
+      });
+    } else {
+      res.json({
+        success: false,
+        session: {
+          id: session.id,
+          payment_status: session.payment_status
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Session verification error:', error);
+    res.status(500).json({ error: 'Failed to verify session' });
+  }
+});
+
 // Webhook handler for Stripe events
 router.post('/webhook', async (req, res) => {
   if (!stripe) {
