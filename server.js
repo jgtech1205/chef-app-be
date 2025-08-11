@@ -74,8 +74,27 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // CORS configuration (after raw body middleware)
+const allowedOrigins = [
+  'https://chef-app-frontend.vercel.app',
+  'https://chef-app-frontend-delta.vercel.app',
+  'https://chef-app-frontend-alpha.vercel.app',
+  'https://chef-app-frontend-beta.vercel.app',
+  'http://localhost:3000', // For local development
+  'http://localhost:5173'  // For Vite development
+];
+
 app.use(cors({
-  origin: 'https://chef-app-frontend.vercel.app',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept']
@@ -83,7 +102,12 @@ app.use(cors({
 
 // Manual CORS headers as backup
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://chef-app-frontend.vercel.app');
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
