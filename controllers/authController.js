@@ -17,19 +17,38 @@ const authController = {
       
       console.log('Login attempt:', { email, passwordLength: password?.length })
 
-      // Find user - check both regular users (isActive) and team members (status: 'active')
-      const user = await User.findOne({ 
-        email, 
-        $or: [
-          { isActive: true },
-          { status: 'active' }
-        ]
-      })
+      // Find user by email
+      const user = await User.findOne({ email })
       
       console.log('User found:', user ? { id: user._id, email: user.email, status: user.status, isActive: user.isActive } : 'No user found')
       
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" })
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is deactivated" })
+      }
+
+      // Check user status (for team members)
+      if (user.role === 'user' && user.status !== 'active') {
+        if (user.status === 'pending') {
+          return res.status(401).json({ 
+            message: "Access pending approval",
+            status: "pending"
+          })
+        } else if (user.status === 'rejected') {
+          return res.status(401).json({ 
+            message: "Access denied",
+            status: "rejected"
+          })
+        } else {
+          return res.status(401).json({ 
+            message: "Account is not active",
+            status: user.status
+          })
+        }
       }
 
       // Check password
