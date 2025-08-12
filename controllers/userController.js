@@ -452,7 +452,12 @@ const userController = {
 
       await chef.save()
 
-      res.status(201).json({ success: true, userId: chef._id, status: chef.status })
+      // Return response in the expected format
+      res.status(201).json({ 
+        id: chef._id.toString(), 
+        status: chef.status, 
+        userId: chef._id.toString() 
+      })
     } catch (error) {
       console.error('Request chef access error:', error)
       res.status(500).json({ message: 'Server error' })
@@ -480,7 +485,13 @@ const userController = {
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
-      res.json({ success: true, data: user });
+      res.json({ 
+        data: { 
+          id: user._id.toString(), 
+          status: user.status, 
+          name: user.name 
+        } 
+      });
     } catch (error) {
       console.error('Get profile by id error:', error);
       res.status(500).json({ message: 'Server error' });

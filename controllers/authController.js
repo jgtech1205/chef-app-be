@@ -80,113 +80,103 @@ const authController = {
         return res.status(403).json({ message: "Restaurant access is currently suspended" })
       }
 
-      // Find existing approved users for this restaurant
-      const existingUsers = await User.find({ 
-        organization: orgId,
+      // Find the head chef for this restaurant
+      const headChef = await User.findOne({ 
+        _id: restaurant.headChef,
+        role: 'head-chef',
         status: 'active',
-        role: 'user'
-      }).select('name email qrAccess qrAccessDate');
+        isActive: true
+      })
 
-      // If no existing users, create a new QR access user
-      if (existingUsers.length === 0) {
-        // Generate unique anonymous user for QR access
-        const anonymousEmail = `qr-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@chef.local`
-        const tempPassword = Math.random().toString(36).slice(-8)
+      if (!headChef) {
+        return res.status(404).json({ message: "Head chef not found or inactive" })
+      }
 
-        // Create anonymous user with QR access
-        const qrUser = new User({
-          email: anonymousEmail,
-          password: tempPassword,
-          name: `QR User ${Date.now()}`,
-          role: "user",
-          organization: orgId,
-          restaurant: restaurant._id,
-          status: "active",
-          isActive: true,
-          qrAccess: true, // New field to identify QR-based users
-          qrAccessDate: new Date(),
-          permissions: {
-            // QR users get basic recipe viewing permissions
-            canViewRecipes: true,
-            canViewPlateups: true,
-            canViewNotifications: true,
-            canViewPanels: true,
-            // No edit permissions for QR users
-            canEditRecipes: false,
-            canDeleteRecipes: false,
-            canUpdateRecipes: false,
-            canCreatePlateups: false,
-            canDeletePlateups: false,
-            canUpdatePlateups: false,
-            canCreateNotifications: false,
-            canDeleteNotifications: false,
-            canUpdateNotifications: false,
-            canCreatePanels: false,
-            canDeletePanels: false,
-            canUpdatePanels: false,
-            canManageTeam: false,
-            canAccessAdmin: false,
-          },
-        })
+      // Find all team members for this restaurant
+      const teamMembers = await User.find({ 
+        organization: orgId,
+        role: 'user',
+        status: { $in: ['active', 'pending', 'rejected'] }
+      }).select('name email role status permissions qrAccess qrAccessDate')
 
-        await qrUser.save()
+      // Check if there are any approved team members
+      const approvedTeamMembers = teamMembers.filter(member => member.status === 'active')
+      const pendingMembers = teamMembers.filter(member => member.status === 'pending')
+      const rejectedMembers = teamMembers.filter(member => member.status === 'rejected')
 
-        // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(qrUser._id)
-
-        res.json({
-          message: "QR authentication successful",
-          user: {
-            id: qrUser._id,
-            email: qrUser.email,
-            name: qrUser.name,
-            role: qrUser.role,
-            organization: qrUser.organization,
-            restaurant: qrUser.restaurant,
-            permissions: qrUser.permissions,
-            qrAccess: qrUser.qrAccess,
-          },
-          restaurant: {
-            id: restaurant._id,
-            name: restaurant.name,
-            organizationId: restaurant.organizationId,
-          },
-          accessToken,
-          refreshToken,
-        })
-      } else {
-        // Use the first existing approved user for QR access
-        const existingUser = existingUsers[0];
+      // If there are approved team members, use the first one for QR access
+      if (approvedTeamMembers.length > 0) {
+        const approvedMember = approvedTeamMembers[0]
         
         // Update QR access date
-        existingUser.qrAccess = true;
-        existingUser.qrAccessDate = new Date();
-        await existingUser.save();
+        approvedMember.qrAccess = true
+        approvedMember.qrAccessDate = new Date()
+        await approvedMember.save()
 
         // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(existingUser._id)
+        const { accessToken, refreshToken } = generateTokens(approvedMember._id)
 
-        res.json({
-          message: "QR authentication successful",
+        return res.json({
+          message: "QR authentication successful - Approved team member",
           user: {
-            id: existingUser._id,
-            email: existingUser.email,
-            name: existingUser.name,
-            role: existingUser.role,
-            organization: existingUser.organization,
-            restaurant: existingUser.restaurant,
-            permissions: existingUser.permissions,
-            qrAccess: existingUser.qrAccess,
-          },
-          restaurant: {
-            id: restaurant._id,
-            name: restaurant.name,
-            organizationId: restaurant.organizationId,
+            id: approvedMember._id,
+            email: approvedMember.email,
+            name: approvedMember.name,
+            role: approvedMember.role,
+            status: approvedMember.status,
+            permissions: approvedMember.permissions,
+            qrAccess: approvedMember.qrAccess,
           },
           accessToken,
           refreshToken,
         })
       }
+
+      // If no approved team members, check if there are pending or rejected members
+      if (pendingMembers.length > 0) {
+        return res.status(401).json({ 
+          message: "Access pending approval",
+          status: "pending",
+          pendingCount: pendingMembers.length
+        })
+      }
+
+      if (rejectedMembers.length > 0) {
+        return res.status(401).json({ 
+          message: "Access denied",
+          status: "rejected",
+          rejectedCount: rejectedMembers.length
+        })
+      }
+
+      // If no team members exist, use the head chef for QR access
+      // Update QR access date for head chef
+      headChef.qrAccess = true
+      headChef.qrAccessDate = new Date()
+      await headChef.save()
+
+      // Generate tokens
+      const { accessToken, refreshToken } = generateTokens(headChef._id)
+
+      res.json({
+        message: "QR authentication successful - Head chef",
+        user: {
+          id: headChef._id,
+          email: headChef.email,
+          name: headChef.name,
+          role: headChef.role,
+          status: headChef.status,
+          permissions: headChef.permissions,
+          qrAccess: headChef.qrAccess,
+        },
+        restaurant: {
+          id: restaurant._id,
+          name: restaurant.name,
+          organizationId: restaurant.organizationId,
+        },
+        accessToken,
+        refreshToken,
+      })
     } catch (error) {
       console.error("QR authentication error:", error)
       res.status(500).json({ message: "Server error during QR authentication" })
@@ -196,13 +186,73 @@ const authController = {
   async loginWithChefId(req, res) {
     try {
       const { chefId, headChefId } = req.params
-      // Find user by chefId
-      const user = await User.findOne({ _id: chefId, status: "active", isActive: true, headChef: headChefId })
-      if (!user) {
-        return res.status(404).json({ message: "User not found" })
+      
+      // First, find the head chef by organization ID
+      const headChef = await User.findOne({ 
+        organization: headChefId,
+        role: 'head-chef',
+        isActive: true 
+      })
+      
+      if (!headChef) {
+        return res.status(404).json({ message: "Head chef not found" })
       }
-      // Generate tokens
+      
+      // Find team member by chefId and verify they belong to this head chef
+      const user = await User.findOne({ 
+        _id: chefId, 
+        headChef: headChef._id,
+        organization: headChefId,
+        isActive: true 
+      })
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found or not associated with this head chef" })
+      }
+
+      // Check user status and handle accordingly
+      if (user.status === 'pending') {
+        return res.status(401).json({ 
+          message: "Access pending approval",
+          status: "pending",
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status
+          }
+        })
+      }
+
+      if (user.status === 'rejected') {
+        return res.status(401).json({ 
+          message: "Access denied",
+          status: "rejected",
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status
+          }
+        })
+      }
+
+      if (user.status !== 'active') {
+        return res.status(401).json({ 
+          message: "User account is not active",
+          status: user.status
+        })
+      }
+
+      // Update last login
+      user.lastLogin = new Date()
+      await user.save()
+
+      // Generate tokens for approved user
       const { accessToken, refreshToken } = generateTokens(user._id)
+      
       res.json({
         message: "Login successful",
         user: {
@@ -210,6 +260,7 @@ const authController = {
           email: user.email,
           name: user.name,
           role: user.role,
+          status: user.status,
           permissions: user.permissions,
           avatar: user.avatar,
         },

@@ -39,11 +39,88 @@ const registerValidation = [
  */
 router.post("/login", loginValidation, authController.login)
 
+/**
+ * @swagger
+ * /api/auth/login/{headChefId}/{chefId}:
+ *   post:
+ *     summary: Team member login with head chef and chef IDs
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: headChefId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization ID (same as head chef's organization field)
+ *       - in: path
+ *         name: chefId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Team member user ID
+ *     responses:
+ *       200:
+ *         description: Login successful for approved team member
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     permissions:
+ *                       type: object
+ *                     avatar:
+ *                       type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       401:
+ *         description: Access denied or pending approval
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *       404:
+ *         description: User not found
+ */
 router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
 
 /**
  * @swagger
- * /api/auth/qr/:orgId:
+ * /api/auth/qr/{orgId}:
  *   post:
  *     summary: Authenticate via QR code for restaurant access
  *     tags: [Auth]
@@ -54,11 +131,66 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *         schema:
  *           type: string
  *         description: Restaurant organization ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties: {}
  *     responses:
  *       200:
  *         description: QR authentication successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     permissions:
+ *                       type: object
+ *                     qrAccess:
+ *                       type: boolean
+ *                 restaurant:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     organizationId:
+ *                       type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       401:
+ *         description: Access denied or pending approval
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 status:
+ *                   type: string
  *       404:
- *         description: Restaurant not found
+ *         description: Restaurant or head chef not found
  *       403:
  *         description: Restaurant access suspended
  */
