@@ -282,24 +282,10 @@ const userController = {
       if (status) user.status = status;
       await user.save();
 
-      // If user was just approved (status changed from pending to active), generate login tokens
-      let loginData = null;
+      // If user was just approved (status changed from pending to active), return login URL
+      let loginUrl = null;
       if (wasPending && user.status === 'active') {
-        const { generateTokens } = require('../utils/tokenUtils');
-        const { accessToken, refreshToken } = generateTokens(user._id);
-        
-        loginData = {
-          accessToken,
-          refreshToken,
-          user: {
-            id: user._id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            status: user.status,
-            permissions: user.permissions,
-          }
-        };
+        loginUrl = `${process.env.FRONTEND_URL || 'https://app.chefenplace.com'}/login/${user.organization}`;
       }
 
       res.json({
@@ -313,7 +299,7 @@ const userController = {
           isActive: user.isActive,
           status: user.status,
         },
-        loginData, // Include login data if user was just approved
+        loginUrl, // Include login URL if user was just approved
       });
     } catch (error) {
       console.error('Update team member error:', error);
@@ -422,14 +408,19 @@ const userController = {
         return res.status(404).json({ message: 'Head chef not found' })
       }
 
-      // Check if user already exists for this head chef
+      // Check for name uniqueness within the same organization
+      const fullName = `${firstName} ${lastName}`
       const existingChef = await User.findOne({ 
-        name: `${firstName} ${lastName}`, 
-        headChef: headChefId,
-        role: 'user' 
+        name: fullName, 
+        organization: headChef.organization,
+        role: 'user',
+        isActive: true
       })
+      
       if (existingChef) {
-        return res.status(400).json({ message: 'You have already requested access' })
+        return res.status(400).json({ 
+          message: 'A team member with this name already exists in this restaurant. Please use a different name or contact your head chef.' 
+        })
       }
       
       // Generate email and password automatically
@@ -443,7 +434,7 @@ const userController = {
       const chef = new User({
         email: email,
         password: hashedPassword,
-        name: `${firstName} ${lastName}`,
+        name: fullName,
         role: 'user',
         headChef: headChefId,
         organization: headChef.organization, // Set organization from head chef

@@ -83,8 +83,6 @@ router.post("/login", loginValidation, authController.login)
  *                       type: string
  *                     permissions:
  *                       type: object
- *                     avatar:
- *                       type: string
  *                 accessToken:
  *                   type: string
  *                 refreshToken:
@@ -122,7 +120,7 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  * @swagger
  * /api/auth/qr/{orgId}:
  *   post:
- *     summary: Authenticate via QR code for restaurant access
+ *     summary: QR code authentication - returns login URL
  *     tags: [Auth]
  *     parameters:
  *       - in: path
@@ -130,17 +128,67 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *         required: true
  *         schema:
  *           type: string
- *         description: Restaurant organization ID
+ *         description: Organization ID (restaurant identifier)
+ *     responses:
+ *       200:
+ *         description: QR code scanned successfully, returns login URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 loginUrl:
+ *                   type: string
+ *                 restaurant:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     organizationId:
+ *                       type: string
+ *       404:
+ *         description: Restaurant not found
+ *       403:
+ *         description: Restaurant access suspended
+ */
+router.post("/qr/:orgId", authController.qrAuth)
+
+/**
+ * @swagger
+ * /api/auth/login/name/{orgId}:
+ *   post:
+ *     summary: Team member login with first and last name
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization ID (restaurant identifier)
  *     requestBody:
- *       required: false
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             properties: {}
+ *             required:
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 description: Team member's first name
+ *               lastName:
+ *                 type: string
+ *                 description: Team member's last name
  *     responses:
  *       200:
- *         description: QR authentication successful
+ *         description: Login successful for approved team member
  *         content:
  *           application/json:
  *             schema:
@@ -163,8 +211,8 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *                       type: string
  *                     permissions:
  *                       type: object
- *                     qrAccess:
- *                       type: boolean
+ *                     organization:
+ *                       type: string
  *                 restaurant:
  *                   type: object
  *                   properties:
@@ -178,8 +226,10 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *                   type: string
  *                 refreshToken:
  *                   type: string
+ *       400:
+ *         description: Missing first name or last name
  *       401:
- *         description: Access denied or pending approval
+ *         description: Team member not found or access denied
  *         content:
  *           application/json:
  *             schema:
@@ -190,11 +240,11 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *                 status:
  *                   type: string
  *       404:
- *         description: Restaurant or head chef not found
+ *         description: Restaurant not found
  *       403:
  *         description: Restaurant access suspended
  */
-router.post("/qr/:orgId", authController.qrAuth)
+router.post("/login/name/:orgId", authController.loginWithName)
 
 /**
  * @swagger

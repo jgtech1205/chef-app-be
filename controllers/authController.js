@@ -83,7 +83,103 @@ const authController = {
     }
   },
 
-  // QR Code Authentication for Restaurant Access
+  // Name-based login for team members
+  async loginWithName(req, res) {
+    try {
+      const { orgId } = req.params
+      const { firstName, lastName } = req.body
+
+      // Validate input
+      if (!firstName || !lastName) {
+        return res.status(400).json({ 
+          message: "First name and last name are required" 
+        })
+      }
+
+      // Find restaurant by organization ID
+      const restaurant = await Restaurant.findOne({ organizationId: orgId, isActive: true })
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found or inactive" })
+      }
+
+      // Check if restaurant is active
+      if (restaurant.status === 'suspended' || restaurant.status === 'cancelled') {
+        return res.status(403).json({ message: "Restaurant access is currently suspended" })
+      }
+
+      // Find team member by name within this organization
+      const teamMember = await User.findOne({ 
+        organization: orgId,
+        role: 'user',
+        isActive: true,
+        $or: [
+          { name: `${firstName} ${lastName}` },
+          { name: `${firstName} ${lastName}`.toLowerCase() },
+          { name: `${firstName} ${lastName}`.toUpperCase() }
+        ]
+      })
+
+      if (!teamMember) {
+        return res.status(401).json({ 
+          message: "Team member not found. Please check your name or contact your head chef." 
+        })
+      }
+
+      // Check user status
+      if (teamMember.status === 'pending') {
+        return res.status(401).json({ 
+          message: "Access pending approval. Please contact your head chef.",
+          status: "pending"
+        })
+      }
+
+      if (teamMember.status === 'rejected') {
+        return res.status(401).json({ 
+          message: "Access denied. Please contact your head chef.",
+          status: "rejected"
+        })
+      }
+
+      if (teamMember.status !== 'active') {
+        return res.status(401).json({ 
+          message: "Account is not active. Please contact your head chef.",
+          status: teamMember.status
+        })
+      }
+
+      // Update last login
+      teamMember.lastLogin = new Date()
+      await teamMember.save()
+
+      // Generate tokens
+      const { accessToken, refreshToken } = generateTokens(teamMember._id)
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: teamMember._id,
+          email: teamMember.email,
+          name: teamMember.name,
+          role: teamMember.role,
+          status: teamMember.status,
+          permissions: teamMember.permissions,
+          organization: teamMember.organization,
+        },
+        restaurant: {
+          id: restaurant._id,
+          name: restaurant.name,
+          organizationId: restaurant.organizationId,
+        },
+        accessToken,
+        refreshToken,
+      })
+    } catch (error) {
+      console.error("Name-based login error:", error)
+      res.status(500).json({ message: "Server error" })
+    }
+  },
+
+  // QR Code - Return login URL instead of automatic login
   async qrAuth(req, res) {
     try {
       const { orgId } = req.params
@@ -99,102 +195,17 @@ const authController = {
         return res.status(403).json({ message: "Restaurant access is currently suspended" })
       }
 
-      // Find the head chef for this restaurant
-      const headChef = await User.findOne({ 
-        _id: restaurant.headChef,
-        role: 'head-chef',
-        status: 'active',
-        isActive: true
-      })
-
-      if (!headChef) {
-        return res.status(404).json({ message: "Head chef not found or inactive" })
-      }
-
-      // Find all team members for this restaurant
-      const teamMembers = await User.find({ 
-        organization: orgId,
-        role: 'user',
-        status: { $in: ['active', 'pending', 'rejected'] }
-      }).select('name email role status permissions qrAccess qrAccessDate')
-
-      // Check if there are any approved team members
-      const approvedTeamMembers = teamMembers.filter(member => member.status === 'active')
-      const pendingMembers = teamMembers.filter(member => member.status === 'pending')
-      const rejectedMembers = teamMembers.filter(member => member.status === 'rejected')
-
-      // If there are approved team members, use the first one for QR access
-      if (approvedTeamMembers.length > 0) {
-        const approvedMember = approvedTeamMembers[0]
-        
-        // Update QR access date
-        approvedMember.qrAccess = true
-        approvedMember.qrAccessDate = new Date()
-        await approvedMember.save()
-
-        // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(approvedMember._id)
-
-        return res.json({
-          message: "QR authentication successful - Approved team member",
-          user: {
-            id: approvedMember._id,
-            email: approvedMember.email,
-            name: approvedMember.name,
-            role: approvedMember.role,
-            status: approvedMember.status,
-            permissions: approvedMember.permissions,
-            qrAccess: approvedMember.qrAccess,
-          },
-          accessToken,
-          refreshToken,
-        })
-      }
-
-      // If no approved team members, check if there are pending or rejected members
-      if (pendingMembers.length > 0) {
-        return res.status(401).json({ 
-          message: "Access pending approval",
-          status: "pending",
-          pendingCount: pendingMembers.length
-        })
-      }
-
-      if (rejectedMembers.length > 0) {
-        return res.status(401).json({ 
-          message: "Access denied",
-          status: "rejected",
-          rejectedCount: rejectedMembers.length
-        })
-      }
-
-      // If no team members exist, use the head chef for QR access
-      // Update QR access date for head chef
-      headChef.qrAccess = true
-      headChef.qrAccessDate = new Date()
-      await headChef.save()
-
-      // Generate tokens
-      const { accessToken, refreshToken } = generateTokens(headChef._id)
-
+      // Return the login URL for this restaurant
+      const loginUrl = `${process.env.FRONTEND_URL || 'https://app.chefenplace.com'}/login/${orgId}`
+      
       res.json({
-        message: "QR authentication successful - Head chef",
-        user: {
-          id: headChef._id,
-          email: headChef.email,
-          name: headChef.name,
-          role: headChef.role,
-          status: headChef.status,
-          permissions: headChef.permissions,
-          qrAccess: headChef.qrAccess,
-        },
+        message: "QR code scanned successfully",
+        loginUrl: loginUrl,
         restaurant: {
           id: restaurant._id,
           name: restaurant.name,
           organizationId: restaurant.organizationId,
-        },
-        accessToken,
-        refreshToken,
+        }
       })
     } catch (error) {
       console.error("QR authentication error:", error)
