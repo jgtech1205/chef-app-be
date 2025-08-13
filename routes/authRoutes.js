@@ -2,6 +2,8 @@ const express = require("express")
 const { body } = require("express-validator")
 const authController = require("../controllers/authController")
 const auth = require("../middlewares/auth")
+const { loginByNameLimiter, trackLoginAttempts, resetLoginAttempts } = require("../middlewares/rateLimiter")
+const { loginByNameValidation, sanitizeLoginByNameInputs } = require("../utils/inputValidation")
 
 const router = express.Router()
 
@@ -20,7 +22,7 @@ const registerValidation = [
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Login user
+ *     summary: Login user with email and password
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -28,16 +30,61 @@ const registerValidation = [
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
+ *               - password
  *             properties:
  *               email:
  *                 type: string
+ *                 format: email
  *               password:
  *                 type: string
  *     responses:
  *       200:
- *         description: Successfully logged in
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     permissions:
+ *                       type: object
+ *                     avatar:
+ *                       type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Invalid credentials
+ *       403:
+ *         description: Account inactive or access denied
+ *       500:
+ *         description: Server error
  */
-router.post("/login", loginValidation, authController.login)
+router.post("/login", [
+  body("email").isEmail().withMessage("Please provide a valid email"),
+  body("password").notEmpty().withMessage("Password is required")
+], authController.login)
 
 /**
  * @swagger
@@ -120,7 +167,7 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  * @swagger
  * /api/auth/qr/{orgId}:
  *   post:
- *     summary: QR code authentication - returns login URL
+ *     summary: QR code authentication - returns restaurant login URL
  *     tags: [Auth]
  *     parameters:
  *       - in: path
@@ -131,29 +178,28 @@ router.post("/login/:headChefId/:chefId", authController.loginWithChefId)
  *         description: Organization ID (restaurant identifier)
  *     responses:
  *       200:
- *         description: QR code scanned successfully, returns login URL
+ *         description: QR code scanned successfully, returns restaurant login URL
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 message:
- *                   type: string
  *                 loginUrl:
  *                   type: string
- *                 restaurant:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     name:
- *                       type: string
- *                     organizationId:
- *                       type: string
- *       404:
- *         description: Restaurant not found
+ *                   description: Restaurant-specific login URL using slug
+ *                   example: "https://app.chefenplace.com/login/joes-pizza"
+ *                 restaurantName:
+ *                   type: string
+ *                   description: Restaurant name
+ *                   example: "Joe's Pizza"
+ *       400:
+ *         description: Invalid restaurant identifier
  *       403:
  *         description: Restaurant access suspended
+ *       404:
+ *         description: Restaurant not found
+ *       500:
+ *         description: Server error
  */
 router.post("/qr/:orgId", authController.qrAuth)
 
@@ -245,6 +291,136 @@ router.post("/qr/:orgId", authController.qrAuth)
  *         description: Restaurant access suspended
  */
 router.post("/login/name/:orgId", authController.loginWithName)
+
+/**
+ * @swagger
+ * /api/auth/login-by-name:
+ *   post:
+ *     summary: Team member login with restaurant name and first/last name (SECURE)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - restaurantName
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               restaurantName:
+ *                 type: string
+ *                 description: Restaurant name (will be converted to kebab-case)
+ *                 minLength: 1
+ *                 maxLength: 100
+ *               firstName:
+ *                 type: string
+ *                 description: Team member's first name
+ *                 minLength: 1
+ *                 maxLength: 50
+ *               lastName:
+ *                 type: string
+ *                 description: Team member's last name
+ *                 minLength: 1
+ *                 maxLength: 50
+ *     responses:
+ *       200:
+ *         description: Login successful for approved team member
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     permissions:
+ *                       type: object
+ *                     organization:
+ *                       type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 expiresIn:
+ *                   type: number
+ *                   description: Token expiration time in seconds
+ *       400:
+ *         description: Missing required fields or validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *       403:
+ *         description: Access denied, pending approval, or restaurant suspended
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *       404:
+ *         description: Restaurant or team member not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *       429:
+ *         description: Too many login attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Server error
+ */
+router.post("/login-by-name", 
+  // Rate limiting middleware
+  loginByNameLimiter,
+  trackLoginAttempts,
+  
+  // Input validation middleware
+  loginByNameValidation,
+  sanitizeLoginByNameInputs,
+  
+  // Controller
+  authController.loginByName
+)
 
 /**
  * @swagger

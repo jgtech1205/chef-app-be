@@ -10,8 +10,24 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     organization: {
       type: String,
+      index: true, // Index for organization queries
     },
     restaurant: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,20 +43,15 @@ const userSchema = new mongoose.Schema(
     emailVerificationExpires: {
       type: Date,
     },
-      password: {
+    password: {
       type: String,
       required: true,
       minlength: 6,
     },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     role: {
       type: String,
-      enum: ["super-admin", "head-chef", "user"],
-      default: "user",
+      enum: ["super-admin", "head-chef", "team-member"],
+      default: "team-member",
     },
     headChef: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,7 +61,7 @@ const userSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["pending", "active", "rejected"],
-      default: "active",
+      default: "pending", // Team members start as pending
     },
     savedRecipes: [
       {
@@ -130,6 +141,43 @@ const userSchema = new mongoose.Schema(
   },
 )
 
+// Compound index for efficient team member queries
+userSchema.index({ 
+  firstName: 1, 
+  lastName: 1, 
+  organization: 1, 
+  role: 1, 
+  status: 1 
+}, { 
+  name: "team_member_lookup" 
+})
+
+// Index for organization-based queries
+userSchema.index({ 
+  organization: 1, 
+  role: 1, 
+  status: 1 
+}, { 
+  name: "organization_members" 
+})
+
+// Index for active team members
+userSchema.index({ 
+  organization: 1, 
+  role: "team-member", 
+  status: "active" 
+}, { 
+  name: "active_team_members" 
+})
+
+// Pre-save middleware to generate full name from firstName and lastName
+userSchema.pre("save", function (next) {
+  if (this.isModified("firstName") || this.isModified("lastName")) {
+    this.name = `${this.firstName} ${this.lastName}`.trim()
+  }
+  next()
+})
+
 // Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next()
@@ -183,9 +231,40 @@ userSchema.pre("save", function (next) {
           canAccessAdmin: true,
         }
         break;
+      case "team-member":
+        // Default team member permissions (view only)
+        this.permissions = {
+          canViewRecipes: true,
+          canViewPlateups: true,
+          canViewNotifications: true,
+          canViewPanels: true,
+          // All other permissions remain false by default
+        }
+        break;
     }
   }
   next()
 })
+
+// Static method to find team member by name and organization
+userSchema.statics.findTeamMember = function(firstName, lastName, organization) {
+  return this.findOne({
+    firstName: { $regex: new RegExp(`^${firstName}$`, 'i') },
+    lastName: { $regex: new RegExp(`^${lastName}$`, 'i') },
+    organization: organization,
+    role: 'team-member',
+    isActive: true
+  })
+}
+
+// Static method to find active team members in organization
+userSchema.statics.findActiveTeamMembers = function(organization) {
+  return this.find({
+    organization: organization,
+    role: 'team-member',
+    status: 'active',
+    isActive: true
+  })
+}
 
 module.exports = mongoose.model("User", userSchema)

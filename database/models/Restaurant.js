@@ -7,6 +7,13 @@ const restaurantSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     type: {
       type: String,
       enum: ['fast-casual', 'fine-dining', 'cafe', 'bakery', 'food-truck', 'catering', 'other'],
@@ -77,6 +84,37 @@ const restaurantSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Generate slug from restaurant name
+restaurantSchema.methods.generateSlug = function() {
+  return this.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
+// Generate unique slug with counter if needed
+restaurantSchema.methods.generateUniqueSlug = async function() {
+  let baseSlug = this.generateSlug();
+  let slug = baseSlug;
+  let counter = 1;
+  
+  while (await mongoose.model('Restaurant').findOne({ slug, _id: { $ne: this._id } })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+  
+  return slug;
+};
+
+// Pre-save middleware to generate slug if not provided
+restaurantSchema.pre('save', async function(next) {
+  if (!this.slug) {
+    this.slug = await this.generateUniqueSlug();
+  }
+  next();
+});
 
 // Check if trial has expired
 restaurantSchema.methods.isTrialExpired = function() {
