@@ -482,6 +482,121 @@ router.post(
   authController.resetPassword,
 )
 
+/**
+ * @swagger
+ * /api/auth/login-team-member:
+ *   post:
+ *     summary: Team member login with first name as username and last name as password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - restaurantName
+ *               - username
+ *               - password
+ *             properties:
+ *               restaurantName:
+ *                 type: string
+ *                 description: Restaurant name (will be converted to slug)
+ *                 example: "Joe's Pizza"
+ *               username:
+ *                 type: string
+ *                 description: Team member's first name
+ *                 example: "John"
+ *               password:
+ *                 type: string
+ *                 description: Team member's last name
+ *                 example: "Doe"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     permissions:
+ *                       type: object
+ *                     organization:
+ *                       type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 expiresIn:
+ *                   type: number
+ *       400:
+ *         description: Missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *       401:
+ *         description: Invalid credentials
+ *       403:
+ *         description: Account pending, rejected, or inactive
+ *       404:
+ *         description: Restaurant or team member not found
+ *       429:
+ *         description: Too many login attempts
+ *       500:
+ *         description: Server error
+ */
+router.post("/login-team-member", 
+  // Rate limiting middleware
+  loginByNameLimiter,
+  trackLoginAttempts,
+  
+  // Input validation middleware
+  [
+    body('restaurantName')
+      .notEmpty()
+      .withMessage('Restaurant name is required')
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Restaurant name must be between 1 and 100 characters'),
+    body('username')
+      .notEmpty()
+      .withMessage('First name (username) is required')
+      .isLength({ min: 1, max: 50 })
+      .withMessage('First name must be between 1 and 50 characters'),
+    body('password')
+      .notEmpty()
+      .withMessage('Last name (password) is required')
+      .isLength({ min: 1, max: 50 })
+      .withMessage('Last name must be between 1 and 50 characters')
+  ],
+  sanitizeLoginByNameInputs,
+  
+  // Controller
+  authController.loginTeamMember
+)
+
 // Chef invite via token
 router.post(
   "/chef-invite/:token",
