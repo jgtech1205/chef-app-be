@@ -477,16 +477,16 @@ const userController = {
         })
       }
       
-      // Generate email and password automatically
-      const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${Date.now()}@chef.local`
-      const tempPassword = Math.random().toString(36).slice(-8)
+      // Create username and password from first and last name
+      const username = firstName.trim();
+      const password = lastName.trim();
       
-      // Hash the generated password
+      // Hash the password
       const bcrypt = require('bcryptjs')
-      const hashedPassword = await bcrypt.hash(tempPassword, 12)
+      const hashedPassword = await bcrypt.hash(password, 12)
 
       const chef = new User({
-        email: email,
+        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${headChef.organization}.local`, // Simple email format
         password: hashedPassword,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -508,11 +508,16 @@ const userController = {
 
       await chef.save()
 
-      // Return response in the expected format
+      // Return response with login credentials
       res.status(201).json({ 
         id: chef._id.toString(), 
         status: chef.status, 
-        userId: chef._id.toString() 
+        userId: chef._id.toString(),
+        loginCredentials: {
+          username: username,
+          password: password,
+          message: "Use your first name as username and last name as password to log in"
+        }
       })
     } catch (error) {
       console.error('Request chef access error:', error)
